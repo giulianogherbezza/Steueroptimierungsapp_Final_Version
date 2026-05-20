@@ -14,313 +14,231 @@ import {
 const START_JAHR = 2023;
 const END_JAHR = 2032;
 const INFLATIONSRATE = 0.015;
-const ZINS_ANLAGEVERMOEGEN = 0.03;
-const ZINS_PK = 0.01;
+const ZINS_ANLAGE = 0.03;
 const ZINS_FK = 0.003;
-const ZINS_SAEULE3A = 0.03;
-const ZINS_LEBENSVERSICHERUNG = 0.003;
-const SICHERHEITSRESERVE = 100; // CHF 100k
-const LEBENSHALTUNGSKOSTEN_VOR_PENSION = 110;
-const LEBENSHALTUNGSKOSTEN_NACH_PENSION = 80;
-const AHV_EINZELRENTE = 29.4;
-const AHV_EHEPAARRENTE = 44.7;
-const EIGENMIETWERT_BERN = 73.5;
-const EIGENMIETWERT_ZUERICH = 73.5;
+const ZINS_SA3 = 0.03;
+const ZINS_LV = 0.003;
+const ZINS_PK = 0.01;
+const SICHERHEITSRESERVE = 100;
+const EIGENMIETWERT = 73.5;
 const UNTERHALT_PROZENT = 0.0075;
-const STEUERWERT_LIEGENSCHAFT = 2450; // CHF in 1000er
 const VERSICHERUNGSPAUSCHALE = 3;
 const VERGABUNGEN = 1.5;
 const SOZIALABZUG_BERN = 10.4;
-const SOZIALABZUG_ZUERICH = 10.4;
-const BERUFSAUSLAGEN = 12;
-const ZWEIVERDIENERABZUG = 9.3;
-const KINDERABZUG = 8;
-const STEUERFREIER_BETRAG_BERN_PRO_KIND = 18; // pro Kind in Ausbildung
-const SAEULE3A_MAX = 7.258; // 2024er Wert pro Person (wird als 13.766 total verwendet)
+const SA3_PRO_PERSON = 6.883;
+const AHV_EINZEL = 29.4;
+const AHV_PAAR = 44.7;
+const PK_RENTE_HERR = 40;
 
-function getAlter(geburtsjahr: number, jahr: number): number {
-  return jahr - geburtsjahr;
+interface TaxResult {
+  steuern: number;
+  einkommenssteuer: number;
+  vermoegenssteuer: number;
+  steuerbaresEinkommen: number;
+  steuerbaresVermoegen: number;
 }
 
-function isPensioniert(geburtsdatum: string, jahr: number): boolean {
-  const geburtsjahr = parseInt(geburtsdatum.substring(0, 4));
-  const geburtsmonat = parseInt(geburtsdatum.substring(5, 7));
-  // Pensionierung im Jahr des 65. Geburtstags
-  return getAlter(geburtsjahr, jahr) >= 65;
-}
+function berechneTaxen(
+  portfolioEnd: number,
+  lvEnd: number,
+  steuerwertLiegenschaft: number,
+  hypothekenTotal: number,
+  totalEinnahmen: number,
+  hypothekarzinsen: number,
+  unterhaltsabzug: number,
+  saeule3aBeitraege: number,
+  berufsauslagen: number,
+  zweiverdienerabzug: number,
+  kinderabzug: number,
+  sozialabzug: number,
+  steuerfreierBetrag: number,
+  kanton: Kanton
+): TaxResult {
+  const wertschriften = Math.round(portfolioEnd * 0.015 * 1000) / 1000;
 
-function getAmortisationen(
-  szenario: Szenario,
-  jahr: number,
-  hypothek1: number,
-  hypothek2: number,
-  hypothek3: number,
-  kumulativeKapitalauszahlungen?: number
-): { betrag: number; h1Rest: number; h2Rest: number; h3Rest: number } {
-  // Diese Funktion berechnet die Amortisation je nach Szenario
-  // Vereinfachte Version basierend auf dem Excel-Modell
+  const steuerbaresEinkommen = Math.max(0, Math.round((
+    totalEinnahmen + wertschriften + EIGENMIETWERT
+    - hypothekarzinsen - unterhaltsabzug - VERSICHERUNGSPAUSCHALE
+    - berufsauslagen - zweiverdienerabzug - saeule3aBeitraege
+    - kinderabzug - VERGABUNGEN - sozialabzug
+  ) * 1000) / 1000);
 
-  if (szenario === "fruehest") {
-    // S1: Alle Hypotheken so früh wie möglich zurückzahlen
-    if (jahr === 2024) return { betrag: 1000, h1Rest: 0, h2Rest: 0, h3Rest: hypothek3 };
-    if (jahr === 2025) return { betrag: 200, h1Rest: 0, h2Rest: 0, h3Rest: 100 };
-    if (jahr === 2026) return { betrag: 200, h1Rest: 0, h2Rest: 0, h3Rest: 0 };
-    return { betrag: 0, h1Rest: 0, h2Rest: 0, h3Rest: 0 };
-  }
+  const steuerbarAktiven = portfolioEnd + SICHERHEITSRESERVE + lvEnd;
+  const steuerbaresVermoegen = Math.max(0, Math.round((
+    steuerbarAktiven + steuerwertLiegenschaft - hypothekenTotal - steuerfreierBetrag
+  ) * 1000) / 1000);
 
-  if (szenario === "spaetmoeglichst") {
-    // S2: Hypotheken erst 2032 tilgen
-    if (jahr === 2032) return { betrag: 1500, h1Rest: 0, h2Rest: 0, h3Rest: 0 };
-    return { betrag: 0, h1Rest: hypothek1, h2Rest: hypothek2, h3Rest: hypothek3 };
-  }
+  const einkommenssteuer = berechneEinkommenssteuer(steuerbaresEinkommen, kanton);
+  const vermoegenssteuer = berechneVermoegenssteuer(steuerbaresVermoegen, kanton);
+  const steuern = Math.round((einkommenssteuer + vermoegenssteuer) * 1000) / 1000;
 
-  if (szenario === "gestaffelt") {
-    // S3: Kapital aus Vorsorgeauszahlungen direkt amortisieren
-    // Vereinfacht: ähnlich S2 aber mit Amortisationen wenn Kapital verfügbar
-    if (jahr === 2029) return { betrag: 700, h1Rest: hypothek1 / 2, h2Rest: hypothek2 / 2, h3Rest: 0 };
-    if (jahr === 2032) return { betrag: 800, h1Rest: 0, h2Rest: 0, h3Rest: 0 };
-    return { betrag: 0, h1Rest: hypothek1, h2Rest: hypothek2, h3Rest: hypothek3 };
-  }
-
-  return { betrag: 0, h1Rest: hypothek1, h2Rest: hypothek2, h3Rest: hypothek3 };
-}
-
-function berechneHypothekarzinsen(
-  h1: number, h2: number, h3: number,
-  jahr: number,
-  zinsSatzAlt: number,
-  zinsSatzNeu: number,
-  h1VerfalJahr: number, h2VerfalJahr: number, h3VerfalJahr: number
-): number {
-  const z1 = jahr <= h1VerfalJahr ? zinsSatzAlt : zinsSatzNeu;
-  const z2 = jahr <= h2VerfalJahr ? zinsSatzAlt : zinsSatzNeu;
-  const z3 = jahr <= h3VerfalJahr ? zinsSatzAlt : zinsSatzNeu;
-
-  // Für 2024: anteilige Berechnung (Hypotheken laufen zu unterschiedlichen Zeiten ab)
-  if (jahr === 2024) {
-    const anteilH1 = (5 / 12) * zinsSatzAlt + (7 / 12) * zinsSatzNeu; // Verfall Mai
-    const anteilH2 = (10 / 12) * zinsSatzAlt + (2 / 12) * zinsSatzNeu; // Verfall Okt
-    return Math.round((h1 * anteilH1 + h2 * anteilH2 + h3 * zinsSatzAlt) * 1000) / 1000;
-  }
-
-  return Math.round((h1 * z1 + h2 * z2 + h3 * z3) * 1000) / 1000;
+  return { steuern, einkommenssteuer, vermoegenssteuer, steuerbaresEinkommen, steuerbaresVermoegen };
 }
 
 export function runSimulation(inputs: SimulationInputs): SimulationResult {
   const { personal, vorsorge, liquiditaet, liegenschaft, kanton, szenario } = inputs;
 
   const geburtsjahrHerr = parseInt(personal.geburtsdatumHerr.substring(0, 4));
+  const geburtsmonatHerr = parseInt(personal.geburtsdatumHerr.substring(5, 7));
   const geburtsjahrFrau = parseInt(personal.geburtsdatumFrau.substring(0, 4));
-  const h1VerfalJahr = parseInt(liegenschaft.hypothek1Verfall.substring(0, 4));
-  const h2VerfalJahr = parseInt(liegenschaft.hypothek2Verfall.substring(0, 4));
-  const h3VerfalJahr = parseInt(liegenschaft.hypothek3Verfall.substring(0, 4));
+  const geburtsmonatFrau = parseInt(personal.geburtsdatumFrau.substring(5, 7));
 
-  const eigenmietwert = kanton === "Bern" ? EIGENMIETWERT_BERN : EIGENMIETWERT_ZUERICH;
+  const h1VJ = parseInt(liegenschaft.hypothek1Verfall.substring(0, 4));
+  const h2VJ = parseInt(liegenschaft.hypothek2Verfall.substring(0, 4));
+  const h3VJ = parseInt(liegenschaft.hypothek3Verfall.substring(0, 4));
+  const h1VM = parseInt(liegenschaft.hypothek1Verfall.substring(5, 7));
+  const h2VM = parseInt(liegenschaft.hypothek2Verfall.substring(5, 7));
+  const h3VM = parseInt(liegenschaft.hypothek3Verfall.substring(5, 7));
 
-  // Anfangswerte
-  let anlagevermoegen = liquiditaet.etfFrau; // 155k
+  const pensionJahrHerr = geburtsjahrHerr + 65;
+  const pensionJahrFrau = geburtsjahrFrau + 65;
+
+  // Born Jan–Jun → retire July 1st at 65 (mid-year); born Jul–Dec → retire Jan 1st next year (full year at 65)
+  const isPensioniert = (gebJahr: number, gebMonat: number, j: number) => {
+    return (j - gebJahr) > 65;
+  };
+  const isMidYear = (gebJahr: number, gebMonat: number, j: number) => {
+    const alter = j - gebJahr;
+    return alter === 65 && gebMonat >= 1 && gebMonat <= 6;
+  };
+
+  let portfolio = liquiditaet.etfFrau;
   let h1 = liegenschaft.hypothek1;
   let h2 = liegenschaft.hypothek2;
   let h3 = liegenschaft.hypothek3;
 
-  // Bewegliche Vermögen (werden gestaffelt ausgezahlt)
-  let pkHerr = vorsorge.pkHerr;
-  let pkFrau = vorsorge.pkFrau;
-  let fk1Herr = vorsorge.freizuegigkeit1Herr;
-  let fk2Herr = vorsorge.freizuegigkeit2Herr;
-  let s3a1Herr = vorsorge.saeule3aHerr1;
-  let s3a2Herr = vorsorge.saeule3aHerr2;
-  let s3a3Herr = 0; // neu in 2023 aufgebaut
-  let s3a1Frau = vorsorge.saeule3aFrau1;
-  let s3a2Frau = vorsorge.saeule3aFrau2;
-  let s3a3Frau = vorsorge.saeule3aFrau3;
-  let s3a4Frau = 0; // neu nach Pensionierung
-  let lebensversicherung = vorsorge.lebensversicherungBetrag;
+  let s3aH1 = vorsorge.saeule3aHerr1;
+  let s3aH2 = vorsorge.saeule3aHerr2;
+  let s3aF1 = vorsorge.saeule3aFrau1;
+  let s3aF2 = vorsorge.saeule3aFrau2;
+  let s3aF3 = vorsorge.saeule3aFrau3;
+  let fk1H = vorsorge.freizuegigkeit1Herr;
+  let fk2H = vorsorge.freizuegigkeit2Herr;
+  let pkF = vorsorge.pkFrau;
+  let lv = vorsorge.lebensversicherungBetrag;
+  let s3aFAccum = 0;
 
   const jahre: JahresDaten[] = [];
   let totalSteuern = 0;
 
-  // Im ersten Jahr: überschüssige Liquidität ins Anlagevermögen
-  const initialLiquiditaet = liquiditaet.liquiditaetHerr + liquiditaet.liquiditaetFrau;
-  const abbauLiquiditaet = initialLiquiditaet - SICHERHEITSRESERVE; // 230 - 100 = 130
-
   for (let jahr = START_JAHR; jahr <= END_JAHR; jahr++) {
-    const alterHerr = getAlter(geburtsjahrHerr, jahr);
-    const alterFrau = getAlter(geburtsjahrFrau, jahr);
-    const herrPensioniert = alterHerr >= 65;
-    const frauPensioniert = alterFrau >= 65;
-    const beidePensioniert = herrPensioniert && frauPensioniert;
+    const jahreNachStart = jahr - START_JAHR;
+    const hP = isPensioniert(geburtsjahrHerr, geburtsmonatHerr, jahr);
+    const hM = isMidYear(geburtsjahrHerr, geburtsmonatHerr, jahr);
+    const fP = isPensioniert(geburtsjahrFrau, geburtsmonatFrau, jahr);
+    const fM = isMidYear(geburtsjahrFrau, geburtsmonatFrau, jahr);
+    const beideP = hP && fP;
 
-    // ─── EINNAHMEN ───────────────────────────────────────────────
-    const einkommenHerr = herrPensioniert ? 0 : (alterHerr === 65 ? personal.einkommenTotal / 2 / 2 : personal.einkommenTotal / 2);
-    const einkommenFrau = frauPensioniert ? 0 : (alterFrau === 65 ? personal.einkommenTotal / 2 / 2 : personal.einkommenTotal / 2);
+    // ─── EINNAHMEN ─────────────────────────────────────────────────
+    const einkommenHerr = hP ? 0 : hM ? personal.einkommenTotal / 4 : personal.einkommenTotal / 2;
+    const einkommenFrau = fP ? 0 : fM ? personal.einkommenTotal / 4 : personal.einkommenTotal / 2;
 
     let ahvRente = 0;
-    if (herrPensioniert && !frauPensioniert) ahvRente = AHV_EINZELRENTE;
-    else if (herrPensioniert && frauPensioniert) ahvRente = AHV_EHEPAARRENTE;
-    else if (alterHerr === 65) ahvRente = AHV_EINZELRENTE / 2; // halbes Jahr
+    if (hP && fP) ahvRente = AHV_PAAR;
+    else if (hP) ahvRente = AHV_EINZEL;
+    else if (fP) ahvRente = AHV_EINZEL;
+    else if (hM) ahvRente = AHV_EINZEL * (12 - geburtsmonatHerr) / 12;
+    else if (fM) ahvRente = AHV_EINZEL * (12 - geburtsmonatFrau) / 12;
 
-    const pkRenteHerr = herrPensioniert ? 40 : (alterHerr === 65 ? 20 : 0);
-    const totalEinnahmen = einkommenHerr + einkommenFrau + ahvRente + pkRenteHerr;
-
-    // ─── AUSGABEN ────────────────────────────────────────────────
-    const jahreNachStart = jahr - START_JAHR;
-    let lebenshaltungskosten: number;
-    if (!beidePensioniert && !herrPensioniert) {
-      lebenshaltungskosten = LEBENSHALTUNGSKOSTEN_VOR_PENSION * Math.pow(1 + INFLATIONSRATE, jahreNachStart);
-    } else {
-      lebenshaltungskosten = LEBENSHALTUNGSKOSTEN_NACH_PENSION * Math.pow(1 + INFLATIONSRATE, jahreNachStart);
-    }
-    lebenshaltungskosten = Math.round(lebenshaltungskosten * 1000) / 1000;
-
-    const hypothekarzinsen = berechneHypothekarzinsen(
-      h1, h2, h3, jahr,
-      liegenschaft.zinsSatzAlt, liegenschaft.zinsSatzNeu,
-      h1VerfalJahr, h2VerfalJahr, h3VerfalJahr
-    );
-    const unterhaltskosten = Math.round(liegenschaft.verkehrswert * UNTERHALT_PROZENT * 1000) / 1000;
-
-    // Amortisationen (szenarioabhängig)
-    const amortiResultat = getAmortisationen(szenario, jahr, h1, h2, h3);
-    const amortisationen = amortiResultat.betrag;
-    h1 = amortiResultat.h1Rest;
-    h2 = amortiResultat.h2Rest;
-    h3 = amortiResultat.h3Rest;
-
-    const saeule3aBeitraege = beidePensioniert ? 0 : (herrPensioniert || frauPensioniert ? 6.883 : 13.766);
-
-    // ─── STEUERTABELLE (vorläufig mit Schätzwerten, wird unten berechnet) ───
-    // Hilfstabelle Steuern
-    const steuerbareEinnahmen = totalEinnahmen;
-    const wertschriftenertraege = Math.round(anlagevermoegen * 0.015 * 1000) / 1000;
-
-    // Abzüge
-    const kinderInAusbildung = Math.max(0, personal.kinderStudierenJahre - (jahr - START_JAHR));
-    const kinderabzug = kinderInAusbildung > 0 ? KINDERABZUG : 0;
-    const berufsauslagen = beidePensioniert ? 0 : (herrPensioniert || frauPensioniert ? 6 : BERUFSAUSLAGEN);
-    const zweiverdienerabzug = beidePensioniert ? 0 : (herrPensioniert || frauPensioniert ? 4.65 : ZWEIVERDIENERABZUG);
-    const steuerfreierBetrag = kanton === "Bern"
-      ? (kinderInAusbildung > 0 ? STEUERFREIER_BETRAG_BERN_PRO_KIND * Math.min(kinderInAusbildung, 2) : 18)
+    const pkRenteHerr = hP ? PK_RENTE_HERR
+      : hM ? PK_RENTE_HERR * (12 - geburtsmonatHerr) / 12
       : 0;
 
-    const steuerbaresEinkommen = Math.max(0, Math.round((
-      steuerbareEinnahmen
-      + wertschriftenertraege
-      + eigenmietwert
-      - hypothekarzinsen
-      - unterhaltskosten * 0.20
-      - VERSICHERUNGSPAUSCHALE
-      - berufsauslagen
-      - zweiverdienerabzug
-      - saeule3aBeitraege
-      - kinderabzug
-      - VERGABUNGEN
-      - SOZIALABZUG_BERN
-    ) * 1000) / 1000);
+    const totalEinnahmen = Math.round((einkommenHerr + einkommenFrau + ahvRente + pkRenteHerr) * 1000) / 1000;
 
-    const steuerbarAktiven = liquiditaet.liquiditaetHerr > SICHERHEITSRESERVE
-      ? SICHERHEITSRESERVE + anlagevermoegen
-      : SICHERHEITSRESERVE + anlagevermoegen;
+    // ─── AUSGABEN (non-steuern parts) ──────────────────────────────
+    // Pension-mode LHK (80k base) kicks in when Herr retires (mid-year or full), inflating from pensionJahrHerr-1
+    let lhk: number;
+    if (hP || hM) {
+      lhk = 80 * Math.pow(1 + INFLATIONSRATE, jahr - pensionJahrHerr + 1);
+    } else {
+      lhk = 110 * Math.pow(1 + INFLATIONSRATE, jahreNachStart);
+    }
+    const lebenshaltungskosten = Math.round(lhk * 1000) / 1000;
 
-    const steuerbaresVermoegen = Math.max(0, Math.round((
-      steuerbarAktiven
-      + STEUERWERT_LIEGENSCHAFT
-      - (h1 + h2 + h3)
-      - steuerfreierBetrag
-    ) * 1000) / 1000);
+    const hypothekenTotalStart = h1 + h2 + h3;
+    const hypothekarzinsen = berechneHyp(h1, h2, h3, jahr, liegenschaft.zinsSatzAlt, liegenschaft.zinsSatzNeu, h1VJ, h2VJ, h3VJ, h1VM, h2VM, h3VM);
+    const unterhaltskosten = Math.round(liegenschaft.verkehrswert * UNTERHALT_PROZENT * 1000) / 1000;
+    const unterhaltsabzug = Math.round(unterhaltskosten * 0.20 * 1000) / 1000;
 
-    const einkommenssteuer = berechneEinkommenssteuer(steuerbaresEinkommen, kanton);
-    const vermoegenssteuer = berechneVermoegenssteuer(steuerbaresVermoegen, kanton);
-    const steuern = Math.round((einkommenssteuer + vermoegenssteuer) * 1000) / 1000;
+    const { amortisation, nH1, nH2, nH3 } = getAmort(szenario, jahr, h1, h2, h3);
+    const hypothekenTotalEnd = nH1 + nH2 + nH3;
 
-    const totalAusgaben = Math.round((
-      lebenshaltungskosten + hypothekarzinsen + unterhaltskosten +
-      amortisationen + saeule3aBeitraege + steuern
-    ) * 1000) / 1000;
+    // Herr contributes in his retirement year (account withdrawn same year); Frau contributes while not yet retired
+    const saeule3aBeitraege = beideP ? 0
+      : SA3_PRO_PERSON * ((!hP || jahr === pensionJahrHerr ? 1 : 0) + (!fP ? 1 : 0));
 
+    const kinderInAusbildung = Math.max(0, personal.kinderStudierenJahre - jahreNachStart);
+    const berufsauslagen = beideP ? 0 : hP || fP ? 6 : hM || fM ? 9 : 12;
+    const zweiverdienerabzug = beideP ? 0 : hP || fP ? 0 : hM || fM ? 4.65 : 9.3;
+    const kinderabzug = kinderInAusbildung > 0 ? (kanton === "Bern" ? 8 : 9) : 0;
+    const sozialabzug = kanton === "Bern" ? SOZIALABZUG_BERN : 0;
+    const steuerfreierBetrag = kanton === "Bern"
+      ? (kinderInAusbildung > 0 ? personal.kinderAnzahl * 18 : 18)
+      : 0;
+
+    // ─── PENSION CASHFLOWS ─────────────────────────────────────────
+    const liqZufluss = jahr === START_JAHR
+      ? Math.max(0, liquiditaet.liquiditaetHerr + liquiditaet.liquiditaetFrau - SICHERHEITSRESERVE)
+      : 0;
+
+    // LV: grow to end-of-year value, then cash out if Frau retires
+    const lvEnd = lv > 0 ? Math.round(lv * (1 + ZINS_LV) * 1000) / 1000 : 0;
+    const lvZufluss = (jahr === pensionJahrFrau && lvEnd > 0) ? lvEnd : 0;
+
+    // Compute all post-growth values (each account grows first, then withdrawals are taken from grown value)
+    const s3aH1This = Math.round(s3aH1 * (1 + ZINS_SA3) * 1000) / 1000;
+    const s3aH2This = Math.round(s3aH2 * (1 + ZINS_SA3) * 1000) / 1000;
+    const s3aF1This = Math.round(s3aF1 * (1 + ZINS_SA3) * 1000) / 1000;
+    const s3aF2This = Math.round(s3aF2 * (1 + ZINS_SA3) * 1000) / 1000;
+    const s3aF3Contrib = (!fP && !fM) ? SA3_PRO_PERSON : 0;
+    const s3aF3This = Math.round((s3aF3 + s3aF3Contrib) * (1 + ZINS_SA3) * 1000) / 1000;
+    const fk1HThis = Math.round(fk1H * (1 + ZINS_FK) * 1000) / 1000;
+    const fk2HThis = Math.round(fk2H * (1 + ZINS_FK) * 1000) / 1000;
+    const pkFThis = Math.round(pkF * (1 + ZINS_PK) * 1000) / 1000;
+    const s3aFAccumContrib = (!fP && !fM) ? SA3_PRO_PERSON : 0;
+    const s3aFAccumThis = Math.round((s3aFAccum + s3aFAccumContrib) * (1 + ZINS_SA3) * 1000) / 1000;
+
+    const pb = getPensionBezug(szenario, jahr, pensionJahrHerr, pensionJahrFrau,
+      { s3aH1This, s3aH2This, s3aF1This, fk1HThis, fk2HThis, pkFThis, s3aF2This, s3aF3This, s3aFAccumThis });
+    const kapitalsteuer = berechneKapitalauszahlungssteuer(pb.total, kanton);
+
+    // ─── TWO-PASS TAX CALCULATION ──────────────────────────────────
+    // Pass 1: approximate portfolio_end using start portfolio for taxes
+    const taxArgs = [hypothekarzinsen, unterhaltsabzug, saeule3aBeitraege, berufsauslagen, zweiverdienerabzug, kinderabzug, sozialabzug, steuerfreierBetrag] as const;
+    const tax1 = berechneTaxen(portfolio, lvEnd, liegenschaft.steuerwert, hypothekenTotalStart, totalEinnahmen, ...taxArgs, kanton);
+
+    const ausgaben1 = Math.round((lebenshaltungskosten + hypothekarzinsen + unterhaltskosten + amortisation + saeule3aBeitraege + tax1.steuern) * 1000) / 1000;
+    const sparen1 = Math.round((totalEinnahmen - ausgaben1) * 1000) / 1000;
+    const portfolioEnd = Math.round((portfolio + sparen1 + liqZufluss + lvZufluss + pb.total - kapitalsteuer) * (1 + ZINS_ANLAGE) * 1000) / 1000;
+
+    // Pass 2: compute accurate taxes using end-of-year portfolio
+    const tax = berechneTaxen(portfolioEnd, lvZufluss > 0 ? 0 : lvEnd, liegenschaft.steuerwert, hypothekenTotalStart, totalEinnahmen, ...taxArgs, kanton);
+
+    const totalAusgaben = Math.round((lebenshaltungskosten + hypothekarzinsen + unterhaltskosten + amortisation + saeule3aBeitraege + tax.steuern) * 1000) / 1000;
     const sparenVerzehr = Math.round((totalEinnahmen - totalAusgaben) * 1000) / 1000;
 
-    // ─── BEWEGLICHES VERMÖGEN (Verzinsung + Auszahlungen) ──────
-    // Kapitalauszahlungen aus Vorsorge (gestaffelt, basierend auf Excel-Modell)
-    let steuerbareKapitalauszahlungen = 0;
-    let nichtSteuerbareKapitalauszahlungen = 0;
+    portfolio = portfolioEnd;
+    h1 = nH1; h2 = nH2; h3 = nH3;
 
-    if (jahr === START_JAHR) {
-      // 2023: Säule 3a I Hr. ausgezahlt (60k)
-      steuerbareKapitalauszahlungen += s3a1Herr;
-      s3a1Herr = 0;
-    }
-    if (jahr === 2024) {
-      // 2024: PK Fr. Vorauszahlung 700k
-      steuerbareKapitalauszahlungen += 700;
-      pkFrau -= 700;
-    }
-    if (jahr === 2025) {
-      // 2025: Säule 3a II Hr. (87k)
-      steuerbareKapitalauszahlungen += s3a2Herr;
-      s3a2Herr = 0;
-    }
-    if (jahr === 2026) {
-      steuerbareKapitalauszahlungen += s3a1Frau;
-      s3a1Frau = 0;
-    }
-    if (jahr === 2027) {
-      steuerbareKapitalauszahlungen += fk1Herr;
-      fk1Herr = 0;
-    }
-    if (herrPensioniert && alterHerr === 65) {
-      // PK Hr. als Rentenbezug → kein Kapitalbezug
-      steuerbareKapitalauszahlungen += fk2Herr + s3a3Herr;
-      fk2Herr = 0;
-      s3a3Herr = 0;
-    }
-    if (beidePensioniert && alterFrau === 65) {
-      // PK Fr. Rest als Kapital
-      steuerbareKapitalauszahlungen += pkFrau + s3a2Frau + s3a3Frau + s3a4Frau;
-      nichtSteuerbareKapitalauszahlungen += lebensversicherung;
-      pkFrau = 0;
-      s3a2Frau = 0;
-      s3a3Frau = 0;
-      s3a4Frau = 0;
-      lebensversicherung = 0;
-    }
+    // Update LV and pension accounts (use pre-computed grown values)
+    lv = lvZufluss > 0 ? 0 : lvEnd;
+    s3aH1 = pb.s3aH1Used ? 0 : s3aH1This;
+    s3aH2 = pb.s3aH2Used ? 0 : s3aH2This;
+    s3aF1 = pb.s3aF1Used ? 0 : s3aF1This;
+    s3aF2 = pb.s3aF2Used ? 0 : s3aF2This;
+    s3aF3 = pb.s3aF3Used ? 0 : s3aF3This;
+    fk1H = pb.fk1HUsed ? 0 : fk1HThis;
+    fk2H = pb.fk2HUsed ? 0 : fk2HThis;
+    // pkF: grew this year; partial withdrawal subtracts from grown value; full withdrawal zeroes it
+    if (pb.pkFRestUsed) pkF = 0;
+    else if (pb.pkFPartial > 0) pkF = Math.max(0, Math.round((pkFThis - pb.pkFPartial) * 1000) / 1000);
+    else pkF = pkFThis;
+    s3aFAccum = pb.s3aFAccumUsed ? 0 : s3aFAccumThis;
 
-    const kapitalauszahlungssteuern = berechneKapitalauszahlungssteuer(
-      steuerbareKapitalauszahlungen, kanton
-    );
-
-    // Anlagevermögen Berechnung (Hilfstabelle)
-    const abbauLiqThisJahr = jahr === START_JAHR ? abbauLiquiditaet : 0;
-    anlagevermoegen = Math.round((
-      anlagevermoegen * (1 + ZINS_ANLAGEVERMOEGEN)
-      + sparenVerzehr
-      + abbauLiqThisJahr
-      + nichtSteuerbareKapitalauszahlungen
-      + steuerbareKapitalauszahlungen
-      - kapitalauszahlungssteuern
-      - amortisationen
-    ) * 1000) / 1000;
-
-    // Bewegliches Vermögen mit Verzinsung
-    pkHerr = herrPensioniert ? 0 : Math.round(pkHerr * (1 + ZINS_PK) * 1000) / 1000;
-    pkFrau = Math.round(pkFrau * (1 + ZINS_PK) * 1000) / 1000;
-    fk1Herr = Math.round(fk1Herr * (1 + ZINS_FK) * 1000) / 1000;
-    fk2Herr = Math.round(fk2Herr * (1 + ZINS_FK) * 1000) / 1000;
-    s3a2Herr = Math.round(s3a2Herr * (1 + ZINS_SAEULE3A) * 1000) / 1000;
-    s3a3Herr = Math.round((s3a3Herr + SAEULE3A_MAX) * (1 + ZINS_SAEULE3A) * 1000) / 1000;
-    s3a1Frau = Math.round(s3a1Frau * (1 + ZINS_SAEULE3A) * 1000) / 1000;
-    s3a2Frau = Math.round(s3a2Frau * (1 + ZINS_SAEULE3A) * 1000) / 1000;
-    s3a3Frau = Math.round((s3a3Frau + SAEULE3A_MAX) * (1 + ZINS_SAEULE3A) * 1000) / 1000;
-    lebensversicherung = Math.round(lebensversicherung * (1 + ZINS_LEBENSVERSICHERUNG) * 1000) / 1000;
-
-    const totalBeweglichesVermoegen = pkHerr + pkFrau + fk1Herr + fk2Herr +
-      s3a1Herr + s3a2Herr + s3a3Herr + s3a1Frau + s3a2Frau + s3a3Frau + s3a4Frau + lebensversicherung;
-
-    const totalFreiesVermoegen = SICHERHEITSRESERVE + anlagevermoegen;
-    const hypothekenTotal = h1 + h2 + h3;
-    const totalVermoegen = totalFreiesVermoegen + liegenschaft.verkehrswert - hypothekenTotal;
-
-    totalSteuern += steuern;
+    totalSteuern += tax.steuern;
+    const totalFreiesVermoegen = SICHERHEITSRESERVE + portfolio;
+    const totalVermoegen = totalFreiesVermoegen + liegenschaft.verkehrswert - hypothekenTotalEnd;
 
     jahre.push({
       jahr,
@@ -332,22 +250,22 @@ export function runSimulation(inputs: SimulationInputs): SimulationResult {
       lebenshaltungskosten,
       hypothekarzinsen,
       unterhaltskosten,
-      amortisationen,
+      amortisationen: amortisation,
       saeule3aBeitraege,
-      steuern,
+      steuern: tax.steuern,
       totalAusgaben,
       sparenVerzehr,
       liquiditaetsreserve: SICHERHEITSRESERVE,
-      anlagevermoegen,
+      anlagevermoegen: portfolio,
       totalFreiesVermoegen,
-      totalBeweglichesVermoegen,
+      totalBeweglichesVermoegen: 0,
       liegenschaft: liegenschaft.verkehrswert,
-      hypothekenTotal,
+      hypothekenTotal: hypothekenTotalEnd,
       totalVermoegen,
-      steuerbaresEinkommen,
-      steuerbaresVermoegen,
-      einkommenssteuer,
-      vermoegenssteuer,
+      steuerbaresEinkommen: tax.steuerbaresEinkommen,
+      steuerbaresVermoegen: tax.steuerbaresVermoegen,
+      einkommenssteuer: tax.einkommenssteuer,
+      vermoegenssteuer: tax.vermoegenssteuer,
     });
   }
 
@@ -360,18 +278,104 @@ export function runSimulation(inputs: SimulationInputs): SimulationResult {
   };
 }
 
+function berechneHyp(
+  h1: number, h2: number, h3: number, jahr: number,
+  zAlt: number, zNeu: number,
+  h1VJ: number, h2VJ: number, h3VJ: number,
+  h1VM: number, h2VM: number, h3VM: number
+): number {
+  const calc = (h: number, vj: number, vm: number) => {
+    if (h === 0) return 0;
+    if (jahr < vj) return h * zAlt;
+    if (jahr > vj) return h * zNeu;
+    return h * (vm / 12 * zAlt + (12 - vm) / 12 * zNeu);
+  };
+  return Math.round((calc(h1, h1VJ, h1VM) + calc(h2, h2VJ, h2VM) + calc(h3, h3VJ, h3VM)) * 1000) / 1000;
+}
+
+function getAmort(
+  szenario: Szenario, jahr: number, h1: number, h2: number, h3: number
+): { amortisation: number; nH1: number; nH2: number; nH3: number } {
+  if (szenario === "fruehest") {
+    if (jahr === 2024) return { amortisation: 1000, nH1: 0, nH2: 100, nH3: h3 };
+    if (jahr === 2025) return { amortisation: 200, nH1: 0, nH2: 0, nH3: 200 };
+    if (jahr === 2026) return { amortisation: 200, nH1: 0, nH2: 0, nH3: 0 };
+  }
+  if (szenario === "spaetmoeglichst") {
+    if (jahr === 2032) return { amortisation: 1500, nH1: 0, nH2: 0, nH3: 0 };
+  }
+  if (szenario === "gestaffelt") {
+    if (jahr === 2024) return { amortisation: 400, nH1: 0, nH2: h2, nH3: h3 };
+    if (jahr === 2025) return { amortisation: 100, nH1: 0, nH2: 700, nH3: h3 };
+    if (jahr === 2028) return { amortisation: 700, nH1: 0, nH2: 0, nH3: 0 };
+  }
+  return { amortisation: 0, nH1: h1, nH2: h2, nH3: h3 };
+}
+
+interface PensionGrownValues {
+  s3aH1This: number; s3aH2This: number; s3aF1This: number;
+  fk1HThis: number; fk2HThis: number; pkFThis: number;
+  s3aF2This: number; s3aF3This: number; s3aFAccumThis: number;
+}
+
+interface PensionBezug {
+  total: number; pkFPartial: number;
+  s3aH1Used: boolean; s3aH2Used: boolean; s3aF1Used: boolean;
+  fk1HUsed: boolean; fk2HUsed: boolean; pkFRestUsed: boolean;
+  s3aF2Used: boolean; s3aF3Used: boolean; s3aFAccumUsed: boolean;
+}
+
+function getPensionBezug(
+  szenario: Szenario, jahr: number,
+  pensionJahrHerr: number, pensionJahrFrau: number,
+  g: PensionGrownValues
+): PensionBezug {
+  const r: PensionBezug = {
+    total: 0, pkFPartial: 0,
+    s3aH1Used: false, s3aH2Used: false, s3aF1Used: false,
+    fk1HUsed: false, fk2HUsed: false, pkFRestUsed: false,
+    s3aF2Used: false, s3aF3Used: false, s3aFAccumUsed: false,
+  };
+
+  // Fixed-year withdrawals (post-growth values)
+  if (jahr === 2023) { r.s3aH1Used = true; r.total += g.s3aH1This; }
+  if (jahr === 2025) { r.s3aH2Used = true; r.total += g.s3aH2This; }
+  if (jahr === 2026) { r.s3aF1Used = true; r.total += g.s3aF1This; }
+  if (jahr === 2027) { r.fk1HUsed = true; r.total += g.fk1HThis; }
+
+  // Herr retires: withdraw fk2H, s3aFAccum, s3aF2, s3aF3 (all post-growth)
+  if (jahr === pensionJahrHerr) {
+    r.fk2HUsed = true;     r.total += g.fk2HThis;
+    r.s3aFAccumUsed = true; r.total += g.s3aFAccumThis;
+    r.s3aF2Used = true;    r.total += g.s3aF2This;
+    r.s3aF3Used = true;    r.total += g.s3aF3This;
+  }
+
+  // Frau retires: full PK Frau withdrawal (post-growth) + new s3aF IV contribution
+  if (jahr === pensionJahrFrau) {
+    r.pkFRestUsed = true;
+    r.total += g.pkFThis + SA3_PRO_PERSON;
+  }
+
+  // PK Frau partial withdrawal in 2024 (scenario-dependent cash amount)
+  if (jahr === 2024) {
+    r.pkFPartial = szenario === "gestaffelt" ? 400 : 700;
+    r.total += r.pkFPartial;
+  }
+
+  return r;
+}
+
 export function runAllSimulations(
   inputs: Omit<SimulationInputs, "kanton" | "szenario">
 ): SimulationResult[] {
   const kantone: Kanton[] = ["Bern", "Zuerich"];
   const szenarien: Szenario[] = ["fruehest", "spaetmoeglichst", "gestaffelt"];
   const results: SimulationResult[] = [];
-
   for (const kanton of kantone) {
     for (const szenario of szenarien) {
       results.push(runSimulation({ ...inputs, kanton, szenario }));
     }
   }
-
   return results;
 }
