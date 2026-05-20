@@ -1,6 +1,7 @@
 "use client";
 
 import type { SimulationResult, Kanton, Szenario } from "@/types";
+import Empfehlung from "./Empfehlung";
 import {
   LineChart,
   Line,
@@ -79,6 +80,9 @@ export default function SimulationResults({ results }: Props) {
   return (
     <div className="space-y-8">
       <h2 className="text-2xl font-bold text-slate-900">Simulationsergebnisse</h2>
+
+      {/* Empfehlung ganz oben */}
+      <Empfehlung results={results} />
 
       {/* Vergleichstabelle */}
       <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
