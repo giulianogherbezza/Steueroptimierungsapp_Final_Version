@@ -1,0 +1,41 @@
+{
+  "name": "steueroptimierungsapp",
+  "version": "1.0.0",
+  "description": "Eine App um die beste Amortisationsmöglichkeit zu finden.",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/giulianogherbezza/Steueroptimierungsapp_Final_Version.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/giulianogherbezza/Steueroptimierungsapp_Final_Version/issues"
+  },
+  "homepage": "https://github.com/giulianogherbezza/Steueroptimierungsapp_Final_Version#readme",
+  "dependencies": {
+    "@supabase/supabase-js": "^2.106.0",
+    "next": "^16.2.6",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "recharts": "^3.8.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.3.0",
+    "@types/node": "^25.9.1",
+    "@types/react": "^19.2.15",
+    "@types/react-dom": "^19.2.3",
+    "autoprefixer": "^10.5.0",
+    "eslint": "^9.39.4",
+    "eslint-config-next": "^16.2.6",
+    "postcss": "^8.5.15",
+    "tailwindcss": "^4.3.0",
+    "typescript": "^6.0.3"
+  }
+}
