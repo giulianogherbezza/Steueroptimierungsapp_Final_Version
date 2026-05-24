@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import UserNav from "@/components/UserNav";
 
 export const metadata: Metadata = {
   title: "Steueroptimierung – Hypothekar-Amortisation Bern & Zürich",
@@ -15,14 +16,17 @@ export default function RootLayout({
     <html lang="de">
       <body className="min-h-screen bg-slate-50">
         <header className="bg-white border-b border-slate-200 px-6 py-4">
-          <div className="max-w-7xl mx-auto flex items-center gap-3">
-            <div className="w-8 h-8 bg-blue-600 rounded flex items-center justify-center">
-              <span className="text-white font-bold text-sm">S</span>
+          <div className="max-w-7xl mx-auto flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-blue-600 rounded flex items-center justify-center">
+                <span className="text-white font-bold text-sm">S</span>
+              </div>
+              <div>
+                <h1 className="text-lg font-bold text-slate-900">Steueroptimierung</h1>
+                <p className="text-xs text-slate-500">Hypothekar-Amortisation – Bern &amp; Zürich</p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-lg font-bold text-slate-900">Steueroptimierung</h1>
-              <p className="text-xs text-slate-500">Hypothekar-Amortisation – Bern &amp; Zürich</p>
-            </div>
+            <UserNav />
           </div>
         </header>
         <main className="max-w-7xl mx-auto px-6 py-8">{children}</main>

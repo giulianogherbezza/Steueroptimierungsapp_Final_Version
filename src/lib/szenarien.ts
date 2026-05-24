@@ -19,14 +19,15 @@ export async function ladeSzenarien(): Promise<GespeichertesSzenario[]> {
   return data ?? [];
 }
 
-// Neues Szenario speichern
+// Neues Szenario speichern (user_id wird automatisch aus der Auth-Session gelesen)
 export async function speichereSzenario(
   name: string,
   inputs: Omit<SimulationInputs, "kanton" | "szenario">
 ): Promise<GespeichertesSzenario> {
+  const { data: { user } } = await supabase.auth.getUser();
   const { data, error } = await supabase
     .from("szenarien")
-    .insert({ name, inputs })
+    .insert({ name, inputs, user_id: user?.id })
     .select()
     .single();
 

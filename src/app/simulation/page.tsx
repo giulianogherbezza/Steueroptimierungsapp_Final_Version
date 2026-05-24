@@ -7,6 +7,7 @@ import { speichereSzenario } from "@/lib/szenarien";
 import SimulationForm from "@/components/SimulationForm";
 import SimulationResults from "@/components/SimulationResults";
 import SzenarienListe from "@/components/SzenarienListe";
+import AuthGuard from "@/components/AuthGuard";
 
 const DEFAULT_INPUTS: Omit<SimulationInputs, "kanton" | "szenario"> = {
   personal: {
@@ -90,6 +91,7 @@ export default function SimulationPage() {
   }
 
   return (
+    <AuthGuard>
     <div>
       <div className="mb-8 flex items-start justify-between gap-4 flex-wrap">
         <div>
@@ -159,5 +161,6 @@ export default function SimulationPage() {
         </div>
       )}
     </div>
+    </AuthGuard>
   );
 }
