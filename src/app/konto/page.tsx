@@ -5,7 +5,9 @@ import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { ladeProfil, speichereProfil } from "@/lib/profile";
 import { ladeSzenarien, loescheSzenario } from "@/lib/szenarien";
+import { ladeSteuerKonstanten } from "@/lib/steuerKonstanten";
 import type { GespeichertesSzenario } from "@/lib/szenarien";
+import type { SteuerKonstante } from "@/lib/steuerKonstanten";
 import type { SimulationInputs } from "@/types";
 import AuthGuard from "@/components/AuthGuard";
 
@@ -17,6 +19,7 @@ export default function KontoPage() {
   const [telefon, setTelefon] = useState("");
   const [profilStatus, setProfilStatus] = useState<"idle" | "saving" | "ok" | "error">("idle");
   const [szenarien, setSzenarien] = useState<GespeichertesSzenario[]>([]);
+  const [konstanten, setKonstanten] = useState<SteuerKonstante[]>([]);
   const [ladeStatus, setLadeStatus] = useState<"loading" | "ok" | "error">("loading");
 
   useEffect(() => {
@@ -25,13 +28,16 @@ export default function KontoPage() {
       if (user) setEmail(user.email ?? "");
 
       try {
-        const [profil, scenarios] = await Promise.all([ladeProfil(), ladeSzenarien()]);
+        const [profil, scenarios, kons] = await Promise.all([
+          ladeProfil(), ladeSzenarien(), ladeSteuerKonstanten()
+        ]);
         if (profil) {
           setVorname(profil.vorname ?? "");
           setNachname(profil.nachname ?? "");
           setTelefon(profil.telefon ?? "");
         }
         setSzenarien(scenarios);
+        setKonstanten(kons);
         setLadeStatus("ok");
       } catch {
         setLadeStatus("error");
@@ -192,6 +198,41 @@ export default function KontoPage() {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+
+
+        {/* Steuer-Konstanten */}
+        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+          <div className="px-6 py-4 border-b border-slate-100 bg-slate-50">
+            <h3 className="font-semibold text-slate-900">Steuerparameter</h3>
+            <p className="text-xs text-slate-500 mt-0.5">
+              Kantonale Steuerkonstanten aus der Datenbank – Grundlage der Berechnungen.
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50 border-b border-slate-100">
+                <tr>
+                  <th className="text-left px-6 py-3 text-slate-600 font-medium">Parameter</th>
+                  <th className="text-right px-6 py-3 text-slate-600 font-medium">Wert</th>
+                  <th className="text-left px-6 py-3 text-slate-600 font-medium">Einheit</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {konstanten.map((k) => (
+                  <tr key={k.schluessel} className="hover:bg-slate-50">
+                    <td className="px-6 py-3 text-slate-700">{k.beschreibung}</td>
+                    <td className="px-6 py-3 text-right font-mono font-medium text-slate-900">
+                      {k.einheit.includes("%")
+                        ? `${(k.wert * 100).toFixed(2)}%`
+                        : k.wert.toLocaleString("de-CH")}
+                    </td>
+                    <td className="px-6 py-3 text-slate-400 text-xs">{k.einheit}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       </div>

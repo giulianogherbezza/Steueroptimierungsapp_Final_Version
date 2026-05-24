@@ -11,7 +11,6 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [fehler, setFehler] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
-  const [registerErfolg, setRegisterErfolg] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -24,7 +23,7 @@ export default function LoginPage() {
         router.push("/simulation");
       } else {
         await signUp(email, password);
-        setRegisterErfolg(true);
+        router.push("/onboarding");
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Unbekannter Fehler";
@@ -59,7 +58,7 @@ export default function LoginPage() {
         {/* Tabs */}
         <div className="flex rounded-lg bg-slate-100 p-1 mb-6">
           <button
-            onClick={() => { setModus("login"); setFehler(null); setRegisterErfolg(false); }}
+            onClick={() => { setModus("login"); setFehler(null); setFehler(null); }}
             className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors ${
               modus === "login"
                 ? "bg-white text-slate-900 shadow-sm"
@@ -69,7 +68,7 @@ export default function LoginPage() {
             Anmelden
           </button>
           <button
-            onClick={() => { setModus("register"); setFehler(null); setRegisterErfolg(false); }}
+            onClick={() => { setModus("register"); setFehler(null); setFehler(null); }}
             className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors ${
               modus === "register"
                 ? "bg-white text-slate-900 shadow-sm"
@@ -80,67 +79,53 @@ export default function LoginPage() {
           </button>
         </div>
 
-        {/* Erfolgs-Meldung nach Registrierung */}
-        {registerErfolg ? (
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-sm text-green-800">
-            <p className="font-semibold mb-1">✓ Registrierung erfolgreich!</p>
-            <p>Bitte bestätige deine E-Mail-Adresse und melde dich dann an.</p>
-            <button
-              onClick={() => { setModus("login"); setRegisterErfolg(false); }}
-              className="mt-3 text-blue-600 hover:underline font-medium"
-            >
-              Zur Anmeldung →
-            </button>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              E-Mail
+            </label>
+            <input
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="name@beispiel.ch"
+              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
           </div>
-        ) : (
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
-                E-Mail
-              </label>
-              <input
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="name@beispiel.ch"
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
+
+          <div>
+            <label className="block text-sm font-medium text-slate-700 mb-1">
+              Passwort
+            </label>
+            <input
+              type="password"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder={modus === "register" ? "Mindestens 6 Zeichen" : "••••••••"}
+              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          {fehler && (
+            <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-sm text-red-700">
+              {fehler}
             </div>
+          )}
 
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1">
-                Passwort
-              </label>
-              <input
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder={modus === "register" ? "Mindestens 6 Zeichen" : "••••••••"}
-                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-
-            {fehler && (
-              <div className="bg-red-50 border border-red-200 rounded-lg px-3 py-2 text-sm text-red-700">
-                {fehler}
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-lg text-sm disabled:opacity-50 transition-colors"
-            >
-              {loading
-                ? "Bitte warten…"
-                : modus === "login"
-                ? "Anmelden"
-                : "Konto erstellen"}
-            </button>
-          </form>
-        )}
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-lg text-sm disabled:opacity-50 transition-colors"
+          >
+            {loading
+              ? "Bitte warten…"
+              : modus === "login"
+              ? "Anmelden"
+              : "Konto erstellen"}
+          </button>
+        </form>
       </div>
     </div>
   );
