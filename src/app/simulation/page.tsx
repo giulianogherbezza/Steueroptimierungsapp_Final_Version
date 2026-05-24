@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import type { SimulationInputs, SimulationResult } from "@/types";
 import { runAllSimulations } from "@/lib/simulation";
 import { speichereSzenario } from "@/lib/szenarien";
@@ -51,7 +52,19 @@ const DEFAULT_INPUTS: Omit<SimulationInputs, "kanton" | "szenario"> = {
 };
 
 export default function SimulationPage() {
+  const searchParams = useSearchParams();
   const [inputs, setInputs] = useState(DEFAULT_INPUTS);
+
+  // Szenario vom Konto laden (via sessionStorage)
+  useEffect(() => {
+    if (searchParams.get("laden") === "1") {
+      const gespeichert = sessionStorage.getItem("geladeneInputs");
+      if (gespeichert) {
+        setInputs(JSON.parse(gespeichert));
+        sessionStorage.removeItem("geladeneInputs");
+      }
+    }
+  }, [searchParams]);
   const [results, setResults] = useState<SimulationResult[] | null>(null);
   const [loading, setLoading] = useState(false);
   const [szenarienOffen, setSzenarienOffen] = useState(false);

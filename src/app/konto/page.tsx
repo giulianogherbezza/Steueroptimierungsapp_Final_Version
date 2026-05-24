@@ -1,0 +1,200 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabase";
+import { ladeProfil, speichereProfil } from "@/lib/profile";
+import { ladeSzenarien, loescheSzenario } from "@/lib/szenarien";
+import type { GespeichertesSzenario } from "@/lib/szenarien";
+import type { SimulationInputs } from "@/types";
+import AuthGuard from "@/components/AuthGuard";
+
+export default function KontoPage() {
+  const router = useRouter();
+  const [email, setEmail] = useState("");
+  const [vorname, setVorname] = useState("");
+  const [nachname, setNachname] = useState("");
+  const [telefon, setTelefon] = useState("");
+  const [profilStatus, setProfilStatus] = useState<"idle" | "saving" | "ok" | "error">("idle");
+  const [szenarien, setSzenarien] = useState<GespeichertesSzenario[]>([]);
+  const [ladeStatus, setLadeStatus] = useState<"loading" | "ok" | "error">("loading");
+
+  useEffect(() => {
+    async function init() {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) setEmail(user.email ?? "");
+
+      try {
+        const [profil, scenarios] = await Promise.all([ladeProfil(), ladeSzenarien()]);
+        if (profil) {
+          setVorname(profil.vorname ?? "");
+          setNachname(profil.nachname ?? "");
+          setTelefon(profil.telefon ?? "");
+        }
+        setSzenarien(scenarios);
+        setLadeStatus("ok");
+      } catch {
+        setLadeStatus("error");
+      }
+    }
+    init();
+  }, []);
+
+  async function handleProfilSpeichern(e: React.FormEvent) {
+    e.preventDefault();
+    setProfilStatus("saving");
+    try {
+      await speichereProfil({ vorname, nachname, telefon });
+      setProfilStatus("ok");
+      setTimeout(() => setProfilStatus("idle"), 2000);
+    } catch {
+      setProfilStatus("error");
+      setTimeout(() => setProfilStatus("idle"), 3000);
+    }
+  }
+
+  async function handleSzenarionLoeschen(id: string) {
+    await loescheSzenario(id);
+    setSzenarien((prev) => prev.filter((s) => s.id !== id));
+  }
+
+  function handleSzenarionLaden(inputs: Omit<SimulationInputs, "kanton" | "szenario">) {
+    // Inputs in sessionStorage zwischenspeichern, dann zur Simulation weiterleiten
+    sessionStorage.setItem("geladeneInputs", JSON.stringify(inputs));
+    router.push("/simulation?laden=1");
+  }
+
+  return (
+    <AuthGuard>
+      <div className="max-w-3xl mx-auto space-y-8">
+        <h2 className="text-2xl font-bold text-slate-900">Mein Konto</h2>
+
+        {/* Profil-Sektion */}
+        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+          <div className="px-6 py-4 border-b border-slate-100 bg-slate-50">
+            <h3 className="font-semibold text-slate-900">Persönliche Angaben</h3>
+          </div>
+          <form onSubmit={handleProfilSpeichern} className="p-6 space-y-4">
+            {/* E-Mail (nur lesen) */}
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">E-Mail</label>
+              <input
+                type="email"
+                value={email}
+                disabled
+                className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm bg-slate-50 text-slate-500 cursor-not-allowed"
+              />
+              <p className="text-xs text-slate-400 mt-1">E-Mail kann nicht geändert werden.</p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Vorname</label>
+                <input
+                  type="text"
+                  value={vorname}
+                  onChange={(e) => setVorname(e.target.value)}
+                  placeholder="Max"
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">Nachname</label>
+                <input
+                  type="text"
+                  value={nachname}
+                  onChange={(e) => setNachname(e.target.value)}
+                  placeholder="Muster"
+                  className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-slate-700 mb-1">Telefon</label>
+              <input
+                type="tel"
+                value={telefon}
+                onChange={(e) => setTelefon(e.target.value)}
+                placeholder="+41 79 123 45 67"
+                className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+
+            <div className="flex items-center gap-3 pt-2">
+              <button
+                type="submit"
+                disabled={profilStatus === "saving"}
+                className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-semibold px-5 py-2 rounded-lg disabled:opacity-50 transition-colors"
+              >
+                {profilStatus === "saving" ? "Wird gespeichert…"
+                  : profilStatus === "ok" ? "✓ Gespeichert!"
+                  : profilStatus === "error" ? "Fehler – nochmals versuchen"
+                  : "Angaben speichern"}
+              </button>
+            </div>
+          </form>
+        </div>
+
+        {/* Szenarien-Sektion */}
+        <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+          <div className="px-6 py-4 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
+            <div>
+              <h3 className="font-semibold text-slate-900">Meine Szenarien</h3>
+              <p className="text-xs text-slate-500 mt-0.5">
+                Gespeicherte Berechnungen – klicke auf «Laden» um sie in der Simulation zu öffnen.
+              </p>
+            </div>
+            <span className="text-xs bg-slate-200 text-slate-600 font-medium px-2.5 py-1 rounded-full">
+              {szenarien.length} gespeichert
+            </span>
+          </div>
+
+          <div className="divide-y divide-slate-100">
+            {ladeStatus === "loading" && (
+              <p className="px-6 py-4 text-sm text-slate-400 italic">Wird geladen…</p>
+            )}
+            {ladeStatus === "error" && (
+              <p className="px-6 py-4 text-sm text-red-500">Fehler beim Laden der Szenarien.</p>
+            )}
+            {ladeStatus === "ok" && szenarien.length === 0 && (
+              <p className="px-6 py-4 text-sm text-slate-400 italic">
+                Noch keine Szenarien gespeichert. Führe eine Simulation durch und klicke auf «Speichern».
+              </p>
+            )}
+            {szenarien.map((s) => (
+              <div key={s.id} className="flex items-center justify-between px-6 py-4 hover:bg-slate-50">
+                <div>
+                  <p className="text-sm font-medium text-slate-800">{s.name}</p>
+                  <p className="text-xs text-slate-400 mt-0.5">
+                    {new Date(s.created_at).toLocaleDateString("de-CH", {
+                      day: "2-digit",
+                      month: "2-digit",
+                      year: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => handleSzenarionLaden(s.inputs)}
+                    className="text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 font-medium px-3 py-1.5 rounded-md transition-colors"
+                  >
+                    Laden
+                  </button>
+                  <button
+                    onClick={() => handleSzenarionLoeschen(s.id)}
+                    className="text-xs bg-red-50 hover:bg-red-100 text-red-600 font-medium px-3 py-1.5 rounded-md transition-colors"
+                  >
+                    Löschen
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </AuthGuard>
+  );
+}

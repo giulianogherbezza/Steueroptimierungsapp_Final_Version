@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import Link from "next/link";
 import UserNav from "@/components/UserNav";
 
 export const metadata: Metadata = {
@@ -26,7 +27,17 @@ export default function RootLayout({
                 <p className="text-xs text-slate-500">Hypothekar-Amortisation – Bern &amp; Zürich</p>
               </div>
             </div>
-            <UserNav />
+            <div className="flex items-center gap-4">
+              <nav className="hidden sm:flex items-center gap-1">
+                <Link href="/simulation" className="text-sm text-slate-600 hover:text-slate-900 px-3 py-1.5 rounded-md hover:bg-slate-100 transition-colors font-medium">
+                  Simulation
+                </Link>
+                <Link href="/konto" className="text-sm text-slate-600 hover:text-slate-900 px-3 py-1.5 rounded-md hover:bg-slate-100 transition-colors font-medium">
+                  Mein Konto
+                </Link>
+              </nav>
+              <UserNav />
+            </div>
           </div>
         </header>
         <main className="max-w-7xl mx-auto px-6 py-8">{children}</main>
