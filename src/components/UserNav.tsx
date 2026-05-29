@@ -1,5 +1,9 @@
 "use client";
 
+// Navigationsbereich oben rechts: zeigt die E-Mail-Adresse des eingeloggten
+// Benutzers und einen Abmelden-Button. Reagiert in Echtzeit auf Authentifizierungs-
+// Ereignisse (Login / Logout in einem anderen Tab).
+
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
@@ -11,14 +15,15 @@ export default function UserNav() {
   const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
-    // Aktuellen User laden
+    // Aktuellen User beim Laden der Seite setzen
     supabase.auth.getUser().then(({ data }) => setUser(data.user));
 
-    // Bei Login/Logout automatisch aktualisieren
+    // Auf Auth-Zustandsänderungen hören (Login/Logout auch in anderen Tabs)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
     });
 
+    // Listener beim Unmount entfernen
     return () => subscription.unsubscribe();
   }, []);
 
@@ -27,6 +32,7 @@ export default function UserNav() {
     router.push("/login");
   }
 
+  // Nicht eingeloggt → nichts anzeigen
   if (!user) return null;
 
   return (

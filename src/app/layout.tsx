@@ -1,3 +1,6 @@
+// Globales App-Layout: Header, Navigation, Footer.
+// Gilt für alle Seiten der Anwendung (Next.js App Router).
+
 import type { Metadata } from "next";
 import "./globals.css";
 import Link from "next/link";
@@ -16,6 +19,8 @@ export default function RootLayout({
   return (
     <html lang="de">
       <body className="min-h-screen bg-slate-50">
+
+        {/* ── Seitenkopf mit Logo, Navigation und Login-Status ───────── */}
         <header className="bg-white border-b border-slate-200 px-6 py-4">
           <div className="max-w-7xl mx-auto flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -36,11 +41,14 @@ export default function RootLayout({
                   Mein Konto
                 </Link>
               </nav>
+              {/* E-Mail und Abmelden-Button */}
               <UserNav />
             </div>
           </div>
         </header>
+
         <main className="max-w-7xl mx-auto px-6 py-8">{children}</main>
+
         <footer className="border-t border-slate-200 mt-12 py-4 text-center text-xs text-slate-400">
           Berner Fachhochschule – Praxisprojekt EPRP | Alle Angaben sind fiktiv
         </footer>

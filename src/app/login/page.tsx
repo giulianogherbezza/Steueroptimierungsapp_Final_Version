@@ -1,22 +1,26 @@
 "use client";
 
+// Login- und Registrierungsseite.
+// Beide Modi (Anmelden / Registrieren) teilen sich dasselbe Formular –
+// umgeschaltet wird über den Tab-Bereich. Fehlermeldungen aus der Supabase API
+// werden in verständliche deutsche Texte übersetzt.
+
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { signIn, signUp } from "@/lib/auth";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [modus, setModus] = useState<"login" | "register">("login");
-  const [email, setEmail] = useState("");
+  const [modus, setModus]     = useState<"login" | "register">("login");
+  const [email, setEmail]     = useState("");
   const [password, setPassword] = useState("");
-  const [fehler, setFehler] = useState<string | null>(null);
+  const [fehler, setFehler]   = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setFehler(null);
     setLoading(true);
-
     try {
       if (modus === "login") {
         await signIn(email, password);
@@ -26,6 +30,7 @@ export default function LoginPage() {
         router.push("/onboarding");
       }
     } catch (err: unknown) {
+      // Supabase-Fehlermeldungen auf Deutsch übersetzen
       const msg = err instanceof Error ? err.message : "Unbekannter Fehler";
       if (msg.includes("Invalid login credentials")) {
         setFehler("E-Mail oder Passwort falsch.");
@@ -44,6 +49,7 @@ export default function LoginPage() {
   return (
     <div className="min-h-[60vh] flex items-center justify-center">
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm w-full max-w-md p-8">
+
         {/* Logo */}
         <div className="flex items-center gap-3 mb-8">
           <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
@@ -55,24 +61,20 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* Tabs */}
+        {/* Modus-Tabs */}
         <div className="flex rounded-lg bg-slate-100 p-1 mb-6">
           <button
-            onClick={() => { setModus("login"); setFehler(null); setFehler(null); }}
+            onClick={() => { setModus("login"); setFehler(null); }}
             className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors ${
-              modus === "login"
-                ? "bg-white text-slate-900 shadow-sm"
-                : "text-slate-500 hover:text-slate-700"
+              modus === "login" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
             }`}
           >
             Anmelden
           </button>
           <button
-            onClick={() => { setModus("register"); setFehler(null); setFehler(null); }}
+            onClick={() => { setModus("register"); setFehler(null); }}
             className={`flex-1 py-2 text-sm font-medium rounded-md transition-colors ${
-              modus === "register"
-                ? "bg-white text-slate-900 shadow-sm"
-                : "text-slate-500 hover:text-slate-700"
+              modus === "register" ? "bg-white text-slate-900 shadow-sm" : "text-slate-500 hover:text-slate-700"
             }`}
           >
             Registrieren
@@ -81,9 +83,7 @@ export default function LoginPage() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              E-Mail
-            </label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">E-Mail</label>
             <input
               type="email"
               required
@@ -93,11 +93,8 @@ export default function LoginPage() {
               className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
-
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              Passwort
-            </label>
+            <label className="block text-sm font-medium text-slate-700 mb-1">Passwort</label>
             <input
               type="password"
               required
@@ -119,11 +116,7 @@ export default function LoginPage() {
             disabled={loading}
             className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 rounded-lg text-sm disabled:opacity-50 transition-colors"
           >
-            {loading
-              ? "Bitte warten…"
-              : modus === "login"
-              ? "Anmelden"
-              : "Konto erstellen"}
+            {loading ? "Bitte warten…" : modus === "login" ? "Anmelden" : "Konto erstellen"}
           </button>
         </form>
       </div>

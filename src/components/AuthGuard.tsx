@@ -1,5 +1,10 @@
 "use client";
 
+// Schutzhülle für Seiten, die eine aktive Session voraussetzen.
+// Prüft beim Mounten ob ein eingeloggter Benutzer vorhanden ist.
+// Wenn nicht, wird direkt auf /login weitergeleitet.
+// Solange die Prüfung läuft, erscheint ein einfacher Ladehinweis.
+
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";

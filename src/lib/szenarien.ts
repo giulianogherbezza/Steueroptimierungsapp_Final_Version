@@ -1,3 +1,7 @@
+// Datenbankoperationen für die Tabelle "szenarien" in Supabase.
+// Ein Szenario speichert einen benannten Satz von Simulationseingaben,
+// damit Benutzer verschiedene Fallkonstellationen vergleichen können.
+
 import { supabase } from "./supabase";
 import type { SimulationInputs } from "@/types";
 
@@ -8,7 +12,7 @@ export interface GespeichertesSzenario {
   created_at: string;
 }
 
-// Alle gespeicherten Szenarien laden
+/** Alle gespeicherten Szenarien des eingeloggten Benutzers laden, neueste zuerst */
 export async function ladeSzenarien(): Promise<GespeichertesSzenario[]> {
   const { data, error } = await supabase
     .from("szenarien")
@@ -19,7 +23,11 @@ export async function ladeSzenarien(): Promise<GespeichertesSzenario[]> {
   return data ?? [];
 }
 
-// Neues Szenario speichern (user_id wird automatisch aus der Auth-Session gelesen)
+/**
+ * Neues Szenario speichern.
+ * Die user_id wird automatisch aus der aktiven Supabase-Session übernommen –
+ * die RLS-Policy stellt sicher, dass jeder Benutzer nur seine eigenen Szenarien sieht.
+ */
 export async function speichereSzenario(
   name: string,
   inputs: Omit<SimulationInputs, "kanton" | "szenario">
@@ -35,7 +43,7 @@ export async function speichereSzenario(
   return data;
 }
 
-// Szenario löschen
+/** Szenario anhand seiner ID löschen */
 export async function loescheSzenario(id: string): Promise<void> {
   const { error } = await supabase.from("szenarien").delete().eq("id", id);
   if (error) throw new Error(error.message);

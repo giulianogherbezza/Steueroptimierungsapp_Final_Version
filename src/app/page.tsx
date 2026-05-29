@@ -1,3 +1,7 @@
+// Startseite der App.
+// Zeigt eine kurze Übersicht der drei Amortisationsstrategien und
+// einen direkten Einstieg zur Simulation.
+
 import Link from "next/link";
 
 export default function Home() {
@@ -13,6 +17,7 @@ export default function Home() {
         </p>
       </div>
 
+      {/* Drei Strategien im Überblick */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
         <div className="bg-white rounded-xl border border-slate-200 p-6">
           <div className="w-10 h-10 bg-red-100 rounded-lg flex items-center justify-center mb-4">
@@ -43,6 +48,7 @@ export default function Home() {
         </div>
       </div>
 
+      {/* Kurzanleitung */}
       <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 mb-8">
         <h3 className="font-semibold text-blue-900 mb-2">Wie es funktioniert</h3>
         <ol className="text-sm text-blue-800 space-y-1 list-decimal list-inside">
