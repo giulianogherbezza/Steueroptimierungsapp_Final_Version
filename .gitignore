@@ -3,3 +3,7 @@ node_modules/
 .env.local
 *.log
 .DS_Store
+tsconfig.tsbuildinfo
+dev_output.txt
+*.chunk.js
+next-env.d.ts
